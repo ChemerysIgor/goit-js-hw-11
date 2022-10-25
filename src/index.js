@@ -6,18 +6,13 @@ import { getPicture } from './js/request';
 import SimpleLightbox from 'simplelightbox';
 import 'simplelightbox/dist/simple-lightbox.min.css';
 
-const base_URL = `https://pixabay.com/api/`;
-const KEY = `30718387-37dd0a29c3a586dd3ee616e94`;
+// const input = document.querySelector('input');
+// const btn = document.querySelector(`button`);
+// const loadBtn = document.querySelector(`.load-more`);
 const form = document.querySelector('#search-form');
-const input = document.querySelector('input');
-const btn = document.querySelector(`button`);
 const list = document.querySelector(`.gallery`);
-
-const loadBtn = document.querySelector(`.load-more`);
 let page = 1;
-let totalPages;
 let pictureValue = ``;
-console.log(pictureValue);
 
 var lightbox = new SimpleLightbox('.gallery a', {
   navText: ['<', '>'],
@@ -30,17 +25,19 @@ form.addEventListener(`submit`, onSubmit);
 
 function onSubmit(evt) {
   evt.preventDefault();
-  page = 1;
   list.innerHTML = ``;
-  pictureValue = evt.currentTarget.elements[0].value;
+  pictureValue = evt.currentTarget.elements[0].value.trim();
 
   getPicture(pictureValue, page)
     .then(response => {
-      totalPages = Math.ceil(response.data.totalHits / 40);
       const totalHits = response.data.totalHits;
-      Notiflix.Notify.success(`"Hooray! We found ${totalHits} images." `);
-      console.log(response);
-      if (response.status === 404 || response.data.hits.length === 0) {
+
+      if (
+        response.status === 404 ||
+        pictureValue === `` ||
+        response.status === 400
+      ) {
+        list.innerHTML = ``;
         throw new Error(
           'Sorry, there are no images matching your search query. Please try again.'
         );
@@ -48,80 +45,90 @@ function onSubmit(evt) {
         Notiflix.Notify.failure(
           ' We are sorry, but you have reached the end of search results.'
         );
-      }
+      } else {
+        list.innerHTML = ``;
+        Notiflix.Notify.success(`"Hooray! We found ${totalHits} images." `);
+        list.insertAdjacentHTML(`beforeend`, markup(response.data.hits));
 
-      list.insertAdjacentHTML(`beforeend`, markup(response.data.hits));
-
-      const itemCard = document.querySelector('.gallery').firstElementChild;
-      // console.log(itemCard);
-      const { height: cardHeight } = itemCard.getBoundingClientRect();
-      // console.dir(itemCard.getBoundingClientRect());
-      window.scrollBy({
-        top: cardHeight * 2,
-        behavior: 'smooth',
-      });
-
-      list.addEventListener('click', showgallery);
-      function showgallery(e) {
-        e.preventDefault();
-
-        // list.removeEventListener('click', showgallery);
-      }
-      lightbox.refresh();
-
-      // ------------------ВАРІАНТ З СКРОЛОМ---------//
-      const guard = document.querySelector('.guard');
-      const options = {
-        root: null,
-        rootMargin: `200px`,
-        threshold: 1,
-      };
-      const observer = new IntersectionObserver(onLoad, options);
-      page = 1;
-      observer.observe(guard);
-
-      function onLoad(entries) {
-        entries.forEach(entry => {
-          console.log(entry);
-          if (entry.isIntersecting) {
-            page += 1;
-            getPicture(pictureValue, page).then(response => {
-              list.insertAdjacentHTML(`beforeend`, markup(response.data.hits));
-              lightbox.refresh();
-              const itemCard =
-                document.querySelector('.gallery').firstElementChild;
-              // console.log(itemCard);
-              const { height: cardHeight } = itemCard.getBoundingClientRect();
-              // console.dir(itemCard.getBoundingClientRect());
-              window.scrollBy({
-                top: cardHeight * 2,
-                behavior: 'smooth',
-              });
-
-              list.addEventListener('click', showgallery);
-              function showgallery(e) {
-                e.preventDefault();
-              }
-              console.log(response.data.hits.length);
-              if (response.data.hits.length === 0) {
-                Notiflix.Notify.failure(
-                  ' We are sorry, but you have reached the end of search results.'
-                );
-
-                // loadBtn.setAttribute('hidden', true);
-              }
-            });
-          }
+        const itemCard = document.querySelector('.gallery').firstElementChild;
+        const { height: cardHeight } = itemCard.getBoundingClientRect();
+        window.scrollBy({
+          top: cardHeight * 2,
+          behavior: 'smooth',
         });
-      }
-      // ------------//
 
-      // loadBtn.removeAttribute('hidden');
+        list.addEventListener('click', showgallery);
+        function showgallery(e) {
+          e.preventDefault();
+          // list.removeEventListener('click', showgallery);
+        }
+        lightbox.refresh();
+
+        // ------------------ВАРІАНТ ЗІ СКРОЛОМ---------//
+        const guard = document.querySelector('.guard');
+        const options = {
+          root: null,
+          rootMargin: `50px`,
+          threshold: 1,
+        };
+        const observer = new IntersectionObserver(onLoad, options);
+        page = 1;
+        observer.observe(guard);
+
+        function onLoad(entries) {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              page += 1;
+              getPicture(pictureValue, page).then(response => {
+                if (response.data.hits.length === 0) {
+                  return Notiflix.Notify.failure(
+                    ' We are sorry, but you have reached the end of search results.'
+                  );
+                } else if (
+                  response.status === 404 ||
+                  pictureValue === `` ||
+                  response.status === 400
+                ) {
+                  list.innerHTML = ``;
+                  Notiflix.Notify.failure(
+                    'Sorry, there are no images matching your search query. Please try again.'
+                  );
+                  list.innerHTML = ``;
+                } else {
+                  list.insertAdjacentHTML(
+                    `beforeend`,
+                    markup(response.data.hits)
+                  );
+                  lightbox.refresh();
+                  const itemCard =
+                    document.querySelector('.gallery').firstElementChild;
+                  console.log(itemCard);
+                  const { height: cardHeight } =
+                    itemCard.getBoundingClientRect();
+                  console.dir(itemCard.getBoundingClientRect());
+                  window.scrollBy({
+                    top: cardHeight * 2,
+                    behavior: 'smooth',
+                  });
+
+                  list.addEventListener('click', showgallery);
+                  function showgallery(e) {
+                    e.preventDefault();
+                  }
+                }
+              });
+            }
+          });
+        }
+
+        // loadBtn.removeAttribute('hidden');
+      }
     })
     .catch(error => {
       Notiflix.Notify.failure(error.message);
     });
 }
+// }
 // --------------ВАРІФНТ З КНОПКОЮ-------------------//
 
 // loadBtn.addEventListener(`click`, onLoad);
